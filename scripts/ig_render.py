@@ -1,16 +1,20 @@
-"""캐러셀 JSON → 1080x1350 PNG 슬라이드 렌더링 (브랜드 템플릿).
+"""캐러셀 JSON → 1080x1350 PNG 슬라이드 렌더링 (브랜드 템플릿 v2).
+
+v2 — taste-skill 원칙 적용: 강한 타이포 위계(키커/헤드라인/본문), 절제된 밀도,
+종이 질감(그레인), 얇은 룰·작은 라벨·페이지 번호 디테일, 고스트 숫자, 한 장 한 아이디어.
 
 usage: python scripts/ig_render.py output/instagram/<dir>/content.json
 """
-import json, sys
+import json, random, sys
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
 BRAND = json.loads((ROOT / "templates" / "brand.json").read_text(encoding="utf-8"))
 W, H = BRAND["size"]
 M = BRAND["margin"]
 C = BRAND["colors"]
+KICKER = {"check": "SELF CHECK · 자가진단", "body": "WHY · 원인", "dont": "DON'T · 이건 하지 마세요", "exercise": "DO · 해결 운동"}
 
 
 def font(size, weight="Regular"):
@@ -29,7 +33,6 @@ def wrap(draw, text, f, max_w):
             lines.append(cur); cur = ""; continue
         t = cur + ch
         if draw.textlength(t, font=f) > max_w and cur:
-            # 어절 단위로 끊기
             sp = cur.rfind(" ")
             if sp > 0:
                 lines.append(cur[:sp]); cur = cur[sp + 1:] + ch
@@ -42,30 +45,54 @@ def wrap(draw, text, f, max_w):
     return lines
 
 
-def draw_block(draw, x, y, text, f, fill, max_w, gap=1.25):
+def block(draw, x, y, text, f, fill, max_w, gap=1.22):
     for ln in wrap(draw, text, f, max_w):
         draw.text((x, y), ln, font=f, fill=fill)
         y += int(f.size * gap)
     return y
 
 
-def header(draw, page, total, series, dark_bg):
-    fg = C["white"] if dark_bg else C["green"]
-    muted = "#BFD3CC" if dark_bg else C["text_muted"]
-    draw.text((M, 56), BRAND["name"], font=font(30, "Bold"), fill=fg)
-    s = f"{series}"
-    draw.text((M, 96), s, font=font(24, "Medium"), fill=muted)
-    pg = f"{page}/{total}"
-    f = font(26, "Medium")
-    draw.text((W - M - draw.textlength(pg, font=f), 60), pg, font=f, fill=muted)
+def grain(img, amount=10):
+    """종이 질감 — 미세한 노이즈 오버레이"""
+    rnd = random.Random(7)
+    noise = Image.effect_noise((W // 3, H // 3), amount).resize((W, H), Image.BILINEAR)
+    noise = noise.point(lambda v: 128 + (v - 128) // 2)
+    base = img.convert("L")
+    return Image.blend(img, Image.merge("RGB", (noise, noise, noise)), 0.06)
 
 
-def footer(draw, dark_bg):
-    fg = "#BFD3CC" if dark_bg else C["text_muted"]
-    draw.text((M, H - 90), BRAND["handle"], font=font(24, "Medium"), fill=fg)
-    hint = "→ 넘겨보세요"
-    f = font(24, "Medium")
-    draw.text((W - M - draw.textlength(hint, font=f), H - 90), hint, font=f, fill=fg)
+def frame(d, fg):
+    """얇은 프레임 룰 + 코너 마크"""
+    d.rectangle([M - 30, M - 30, W - M + 30, H - M + 30], outline=fg, width=1)
+    for x in (M - 30, W - M + 30):
+        for y in (M - 30, H - M + 30):
+            d.line([x - 10, y, x + 10, y], fill=fg, width=1); d.line([x, y - 10, x, y + 10], fill=fg, width=1)
+
+
+def header(d, page, total, series, dark):
+    fg = C["white"] if dark else C["green"]
+    mu = "#A9C4BB" if dark else C["text_muted"]
+    d.text((M, M - 4), BRAND["name"], font=font(26, "Bold"), fill=fg)
+    d.text((M + 150, M), "·  " + series, font=font(22, "Medium"), fill=mu)
+    pg = f"{page:02d} / {total:02d}"
+    f = font(22, "Medium")
+    d.text((W - M - d.textlength(pg, font=f), M), pg, font=f, fill=mu)
+    d.line([M, M + 44, W - M, M + 44], fill=mu, width=1)
+
+
+def footer(d, dark, hint="넘겨보세요  →"):
+    mu = "#A9C4BB" if dark else C["text_muted"]
+    d.line([M, H - M - 40, W - M, H - M - 40], fill=mu, width=1)
+    d.text((M, H - M - 26), BRAND["handle"], font=font(22, "Medium"), fill=mu)
+    f = font(22, "Medium")
+    d.text((W - M - d.textlength(hint, font=f), H - M - 26), hint, font=f, fill=mu)
+
+
+def ghost_number(d, n, dark):
+    """고스트 숫자 — 배경에 크게 깔리는 번호"""
+    col = "#155C48" if dark else "#E6E1D6"
+    f = font(520, "Black")
+    d.text((W - M - d.textlength(n, font=f) + 40, H - 700), n, font=f, fill=col)
 
 
 def render_slide(s, page, total, series):
@@ -73,51 +100,76 @@ def render_slide(s, page, total, series):
     dark = kind in ("hook", "cta")
     img = Image.new("RGB", (W, H), C["green"] if dark else C["cream"])
     d = ImageDraw.Draw(img)
-    header(d, page, total, series, dark)
     maxw = W - 2 * M
+    fg = C["white"] if dark else C["green"]
+    mu = "#A9C4BB" if dark else C["text_muted"]
 
     if kind == "hook":
-        y = 330
-        y = draw_block(d, M, y, s["title"], font(84, "Black"), C["white"], maxw, 1.2)
+        frame(d, "#2E6B58")
+        header(d, page, total, series, dark)
+        y = 400
+        d.text((M, y - 70), "01  —  물리치료사가 묻습니다", font=font(24, "Medium"), fill=mu)
+        y = block(d, M, y, s["title"], font(96, "Black"), C["white"], maxw, 1.12)
+        d.rectangle([M, y + 36, M + 140, y + 42], fill=C["accent"])
         if s.get("sub"):
-            d.rectangle([M, y + 30, M + 120, y + 38], fill=C["accent"])
-            draw_block(d, M, y + 70, s["sub"], font(40, "Medium"), "#DCE8E3", maxw, 1.35)
+            block(d, M, y + 80, s["sub"], font(36, "Medium"), "#DCE8E3", maxw - 60, 1.4)
+        footer(d, dark)
 
     elif kind == "cta":
-        y = 360
-        y = draw_block(d, M, y, s["title"], font(72, "Black"), C["white"], maxw, 1.2)
-        d.rectangle([M, y + 30, M + 120, y + 38], fill=C["accent"])
-        y = draw_block(d, M, y + 70, BRAND["cta_default"], font(36, "Medium"), "#DCE8E3", maxw, 1.4)
+        frame(d, "#2E6B58")
+        header(d, page, total, series, dark)
+        y = 380
+        d.text((M, y - 70), "마지막 장", font=font(24, "Medium"), fill=mu)
+        y = block(d, M, y, s["title"], font(76, "Black"), C["white"], maxw, 1.14)
+        d.rectangle([M, y + 36, M + 140, y + 42], fill=C["accent"])
+        y = block(d, M, y + 80, BRAND["cta_default"], font(32, "Medium"), "#DCE8E3", maxw - 60, 1.45)
         if s.get("sub"):
-            draw_block(d, M, y + 40, s["sub"], font(34, "Bold"), C["accent"], maxw)
+            # 다음 편 예고 카드
+            y += 40
+            d.rounded_rectangle([M, y, W - M, y + 120], 16, fill="#0A3529", outline="#2E6B58", width=1)
+            d.text((M + 32, y + 22), "NEXT", font=font(20, "Bold"), fill=C["accent"])
+            block(d, M + 32, y + 52, s["sub"].replace("다음 편: ", ""), font(30, "Bold"), C["white"], maxw - 64, 1.2)
+        footer(d, dark, "팔로우  ♡")
 
     else:
-        # 1차: 높이 측정용 더미 캔버스, 2차: 중앙 정렬해 실제 그리기
-        def body(d, y0):
-            y = y0
-            tag = {"check": "자가진단", "body": "원인", "dont": "주의", "exercise": "해결 운동"}.get(kind, "")
-            if tag:
-                f = font(28, "Bold"); tw = d.textlength(tag, font=f)
-                d.rounded_rectangle([M, y, M + tw + 44, y + 52], 26, fill=C["green"])
-                d.text((M + 22, y + 9), tag, font=f, fill=C["white"])
-                y += 100
-            y = draw_block(d, M, y, s["title"], font(74, "Bold"), C["green"], maxw, 1.2)
-            y += 50
+        frame(d, "#D8D2C4")
+        exercise_no = None
+        if kind == "exercise":
+            t = s["title"]
+            for k, v in {"①": "1", "②": "2", "③": "3", "④": "4"}.items():
+                if t.startswith(k):
+                    exercise_no = v; break
+        if exercise_no:
+            ghost_number(d, exercise_no, dark)
+        header(d, page, total, series, dark)
+
+        def body(d, y):
+            kick = KICKER.get(kind, "")
+            d.text((M, y), kick, font=font(22, "Bold"), fill=C["accent"] if kind == "dont" else C["green"])
+            d.line([M, y + 40, M + 60, y + 40], fill=C["green"], width=2)
+            y += 80
+            title = s["title"]
+            if exercise_no:
+                title = title[1:].strip()
+            y = block(d, M, y, title, font(70, "Bold"), C["green"], maxw, 1.16)
+            y += 48
             if kind == "check":
                 for it in s.get("items", []):
-                    d.rounded_rectangle([M, y + 14, M + 48, y + 62], 8, outline=C["green"], width=4)
-                    d.text((M + 9, y + 8), "✓", font=font(36, "Bold"), fill=C["green"])
-                    y = draw_block(d, M + 76, y, it, font(46, "Medium"), C["text_dark"], maxw - 76, 1.3) + 30
+                    d.rounded_rectangle([M, y + 12, M + 46, y + 58], 6, outline=C["green"], width=3)
+                    d.text((M + 8, y + 6), "✓", font=font(34, "Bold"), fill=C["green"])
+                    y = block(d, M + 74, y, it, font(42, "Medium"), C["text_dark"], maxw - 74, 1.3) + 26
             else:
-                for ln in s.get("lines", []):
-                    d.ellipse([M, y + 20, M + 18, y + 38], fill=C["accent"] if kind == "exercise" else C["green"])
-                    y = draw_block(d, M + 44, y, ln, font(44, "Medium"), C["text_dark"], maxw - 44, 1.3) + 30
+                for i, ln in enumerate(s.get("lines", []), 1):
+                    d.line([M, y + 14, M, y + 52], fill=C["accent"] if kind == "exercise" else C["green"], width=4)
+                    y = block(d, M + 36, y, ln, font(40, "Medium"), C["text_dark"], maxw - 36, 1.32) + 26
             return y
+
         h = body(ImageDraw.Draw(Image.new("RGB", (W, H))), 0)
-        y0 = max(200, (H - h) // 2 - 20)
+        y0 = max(M + 90, (H - h) // 2 - 10)
         body(d, y0)
-    footer(d, dark)
-    return img
+        footer(d, dark)
+
+    return grain(img)
 
 
 def main(path):
