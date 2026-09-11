@@ -95,6 +95,23 @@ def ghost_number(d, n, dark):
     d.text((W - M - d.textlength(n, font=f) + 40, H - 700), n, font=f, fill=col)
 
 
+def place_image(img, rel, box):
+    """박스 안에 일러스트를 비율 유지로 맞춰 흰 카드 위에 배치"""
+    l, t, r, b = box
+    bw, bh = r - l, b - t
+    if bh < 200:
+        return
+    src = Image.open(ROOT / rel).convert("RGB")
+    sw, sh = src.size
+    k = min(bw / sw, bh / sh)
+    src = src.resize((int(sw * k), int(sh * k)), Image.LANCZOS)
+    card = Image.new("RGB", (bw, bh), "#FFFFFF")
+    card.paste(src, ((bw - src.width) // 2, (bh - src.height) // 2))
+    mask = Image.new("L", (bw, bh), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, bw - 1, bh - 1], 24, fill=255)
+    img.paste(card, (l, t), mask)
+
+
 def render_slide(s, page, total, series):
     kind = s["kind"]
     dark = kind in ("hook", "cta")
@@ -107,12 +124,16 @@ def render_slide(s, page, total, series):
     if kind == "hook":
         frame(d, "#2E6B58")
         header(d, page, total, series, dark)
-        y = 400
+        has_img = bool(s.get("image")) and Path(ROOT / s["image"]).exists()
+        y = 250 if has_img else 400
         d.text((M, y - 70), "01  —  물리치료사가 묻습니다", font=font(24, "Medium"), fill=mu)
-        y = block(d, M, y, s["title"], font(96, "Black"), C["white"], maxw, 1.12)
-        d.rectangle([M, y + 36, M + 140, y + 42], fill=C["accent"])
+        y = block(d, M, y, s["title"], font(84 if has_img else 96, "Black"), C["white"], maxw, 1.12)
+        d.rectangle([M, y + 30, M + 140, y + 36], fill=C["accent"])
         if s.get("sub"):
-            block(d, M, y + 80, s["sub"], font(36, "Medium"), "#DCE8E3", maxw - 60, 1.4)
+            y = block(d, M, y + 70, s["sub"], font(34, "Medium"), "#DCE8E3", maxw - 60, 1.4)
+        if has_img:
+            place_image(img, s["image"], (M, max(y + 40, 640), W - M, H - M - 60))
+            d = ImageDraw.Draw(img)
         footer(d, dark)
 
     elif kind == "cta":
@@ -153,6 +174,8 @@ def render_slide(s, page, total, series):
                 title = title[1:].strip()
             y = block(d, M, y, title, font(70, "Bold"), C["green"], maxw, 1.16)
             y += 48
+            if s.get("image") and Path(ROOT / s["image"]).exists():
+                y += 0
             if kind == "check":
                 for it in s.get("items", []):
                     d.rounded_rectangle([M, y + 12, M + 46, y + 58], 6, outline=C["green"], width=3)
@@ -164,9 +187,13 @@ def render_slide(s, page, total, series):
                     y = block(d, M + 36, y, ln, font(40, "Medium"), C["text_dark"], maxw - 36, 1.32) + 26
             return y
 
+        has_img = bool(s.get("image")) and Path(ROOT / s["image"]).exists()
         h = body(ImageDraw.Draw(Image.new("RGB", (W, H))), 0)
-        y0 = max(M + 90, (H - h) // 2 - 10)
-        body(d, y0)
+        y0 = M + 90 if has_img else max(M + 90, (H - h) // 2 - 10)
+        y_end = body(d, y0)
+        if has_img:
+            place_image(img, s["image"], (M, y_end + 10, W - M, H - M - 60))
+            d = ImageDraw.Draw(img)
         footer(d, dark)
 
     return grain(img)
