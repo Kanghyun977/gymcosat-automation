@@ -1,0 +1,18 @@
+{
+  "name": "GYMCOSAT",
+  "series": "물리치료사의 통증 자가진단",
+  "handle": "@gymcosat_official",
+  "size": [1080, 1350],
+  "colors": {
+    "green": "#0E4A3A",
+    "green_dark": "#0A3529",
+    "white": "#FFFFFF",
+    "cream": "#F4F1EA",
+    "accent": "#F2C94C",
+    "text_dark": "#1B1B1B",
+    "text_muted": "#6B7A75"
+  },
+  "font": "C:/Windows/Fonts/NotoSansKR-VF.ttf",
+  "margin": 90,
+  "cta_default": "다음 편 보려면 팔로우 · 저장해두고 운동할 때 꺼내보세요"
+}
