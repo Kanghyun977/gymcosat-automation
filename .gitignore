@@ -1,0 +1,5 @@
+.env
+backup/naver_blog/images/
+backup/instagram/media/
+__pycache__/
+*.pyc

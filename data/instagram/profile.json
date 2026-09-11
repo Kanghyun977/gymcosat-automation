@@ -1,0 +1,49 @@
+{
+  "username": "gymcosat_official",
+  "full_name": "GYMCOSAT (짐코사트)",
+  "profile_url": "https://www.instagram.com/gymcosat_official/",
+  "followers": 107,
+  "following": 9,
+  "posts_count": 68,
+  "biography": "물리치료사, 한체대 스포츠의학 석사 등 재활 전문 PT샵",
+  "external_links": [
+    {
+      "label": "대표 블로그",
+      "url": "https://m.blog.naver.com/97_cosat"
+    },
+    {
+      "label": "장안점",
+      "url": "https://naver.me/xrPembQz"
+    },
+    {
+      "label": "삼양사거리점",
+      "url": "https://naver.me/xdIfAgKX"
+    },
+    {
+      "label": "수유점",
+      "url": "https://naver.me/FV70GwSB"
+    },
+    {
+      "label": "명일점",
+      "url": "https://naver.me/GiageX1Y"
+    }
+  ],
+  "pinned_posts": [
+    "https://www.instagram.com/p/DaMoU6xEf9y/",
+    "https://www.instagram.com/p/DaMowPKEeBh/",
+    "https://www.instagram.com/p/DaMnykbEW4L/"
+  ],
+  "highlights": [
+    "장안점",
+    "명일점",
+    "미아점",
+    "수유점"
+  ],
+  "collected_at": "2026-09-11T04:20:25.432Z",
+  "collection_method": "read-only (Instagram web, logged in as gymcosat_official)",
+  "grid_posts_count": 68,
+  "reels_tab_count": 61,
+  "reels_not_in_grid": 60,
+  "total_media_collected": 128,
+  "note": "프로필 상단 '게시물 68'은 그리드 기준. 릴스 탭에는 그리드에 없는 릴스 60개가 추가로 존재 (reels_extra.json / all_media.json 참고)"
+}
