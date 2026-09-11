@@ -95,8 +95,12 @@ def ghost_number(d, n, dark):
     d.text((W - M - d.textlength(n, font=f) + 40, H - 700), n, font=f, fill=col)
 
 
-def place_image(img, rel, box):
-    """박스 안에 일러스트를 비율 유지로 맞춰 흰 카드 위에 배치"""
+def place_image(img, rel, box, card=True):
+    """박스 안에 일러스트를 비율 유지로 배치.
+
+    card=True  : 흰 라운드 카드 위에 얹음 (사진용)
+    card=False : 배경색이 같은 라인아트를 카드 없이 그대로 얹음 (일러스트용)
+    """
     l, t, r, b = box
     bw, bh = r - l, b - t
     if bh < 200:
@@ -105,11 +109,14 @@ def place_image(img, rel, box):
     sw, sh = src.size
     k = min(bw / sw, bh / sh)
     src = src.resize((int(sw * k), int(sh * k)), Image.LANCZOS)
-    card = Image.new("RGB", (bw, bh), "#FFFFFF")
-    card.paste(src, ((bw - src.width) // 2, (bh - src.height) // 2))
+    if not card:
+        img.paste(src, (l + (bw - src.width) // 2, t + (bh - src.height) // 2))
+        return
+    card_img = Image.new("RGB", (bw, bh), "#FFFFFF")
+    card_img.paste(src, ((bw - src.width) // 2, (bh - src.height) // 2))
     mask = Image.new("L", (bw, bh), 0)
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, bw - 1, bh - 1], 24, fill=255)
-    img.paste(card, (l, t), mask)
+    img.paste(card_img, (l, t), mask)
 
 
 def render_slide(s, page, total, series):
@@ -154,13 +161,15 @@ def render_slide(s, page, total, series):
 
     else:
         frame(d, "#D8D2C4")
+        has_img = bool(s.get("image")) and Path(ROOT / s["image"]).exists()
         exercise_no = None
         if kind == "exercise":
             t = s["title"]
             for k, v in {"①": "1", "②": "2", "③": "3", "④": "4"}.items():
                 if t.startswith(k):
                     exercise_no = v; break
-        if exercise_no:
+        # 일러스트가 있으면 고스트 숫자는 생략 (그림이 시각 앵커 역할)
+        if exercise_no and not has_img:
             ghost_number(d, exercise_no, dark)
         header(d, page, total, series, dark)
 
@@ -187,12 +196,11 @@ def render_slide(s, page, total, series):
                     y = block(d, M + 36, y, ln, font(40, "Medium"), C["text_dark"], maxw - 36, 1.32) + 26
             return y
 
-        has_img = bool(s.get("image")) and Path(ROOT / s["image"]).exists()
         h = body(ImageDraw.Draw(Image.new("RGB", (W, H))), 0)
         y0 = M + 90 if has_img else max(M + 90, (H - h) // 2 - 10)
         y_end = body(d, y0)
         if has_img:
-            place_image(img, s["image"], (M, y_end + 10, W - M, H - M - 60))
+            place_image(img, s["image"], (M, y_end + 10, W - M, H - M - 60), card=dark)
             d = ImageDraw.Draw(img)
         footer(d, dark)
 
